@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Joli Monitoring — Marketing Dashboard</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+</head>
+<body>
+  <header>
+    <h1>📊 Joli Monitoring — لوحة التسويق الرقمي</h1>
+    <div class="controls">
+      <label>الفترة:
+        <select id="periodFilter">
+          <option value="all">كل الفترات</option>
+          <option value="month">آخر شهر</option>
+          <option value="week">آخر 7 أيام</option>
+        </select>
+      </label>
+      <button id="refreshBtn">🔄 تحديث</button>
+      <span id="lastUpdate"></span>
+    </div>
+  </header>
+
+  <section class="kpi-grid">
+    <div class="kpi-card"><span class="label">إجمالي الإنفاق</span><span class="value" id="kpiSpend">—</span></div>
+    <div class="kpi-card"><span class="label">إجمالي الإيرادات</span><span class="value" id="kpiRevenue">—</span></div>
+    <div class="kpi-card"><span class="label">ROAS</span><span class="value" id="kpiRoas">—</span></div>
+    <div class="kpi-card"><span class="label">إجمالي الطلبات</span><span class="value" id="kpiOrders">—</span></div>
+    <div class="kpi-card"><span class="label">متوسط قيمة الطلب (AOV)</span><span class="value" id="kpiAov">—</span></div>
+    <div class="kpi-card"><span class="label">معدل التحويل (CR)</span><span class="value" id="kpiCr">—</span></div>
+    <div class="kpi-card"><span class="label">CTR</span><span class="value" id="kpiCtr">—</span></div>
+    <div class="kpi-card"><span class="label">تكلفة الطلب</span><span class="value" id="kpiCpo">—</span></div>
+  </section>
+
+  <section class="charts">
+    <div class="chart-box"><h3>الإنفاق مقابل الإيرادات (يومي)</h3><canvas id="trendChart"></canvas></div>
+    <div class="chart-box"><h3>توزيع الإنفاق حسب القناة</h3><canvas id="spendChannelChart"></canvas></div>
+    <div class="chart-box"><h3>ROAS لكل قناة</h3><canvas id="roasChannelChart"></canvas></div>
+    <div class="chart-box"><h3>الإيرادات حسب القناة</h3><canvas id="revenueChannelChart"></canvas></div>
+  </section>
+
+  <section class="table-box">
+    <h3>أداء القنوات (إجمالي الفترة)</h3>
+    <table id="channelTable">
+      <thead><tr><th>القناة</th><th>الإنفاق</th><th>الظهور</th><th>النقرات</th><th>المعاملات</th><th>الإيرادات</th><th>ROAS</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <footer>مصدر البيانات: Google Sheets — Joli Monitoring</footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
