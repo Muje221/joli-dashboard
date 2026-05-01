@@ -198,3 +198,9 @@ tbody tr:hover{background:var(--bg-2)}
   .sidebar-footer{margin:0}
   .main{padding:16px}
 }
+.chip{position:relative;padding-right:22px}
+.chip::before{
+  content:"";position:absolute;right:8px;top:50%;
+  width:8px;height:8px;border-radius:50%;
+  background:var(--cc,#3b82f6);transform:translateY(-50%);
+}
