@@ -1,151 +1,122 @@
-// ====== الإعدادات ======
-const SHEET_ID   = "18pvf_fuBjtBdYX4CAFgFCAmaYIRLpVGzsG_0FX0LqfY";
-const SHEET_GID  = "1602116591"; // Daily Performance
-// gviz endpoint يعمل لو الشيت "Anyone with the link can view"
-const SHEET_URL  = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${SHEET_GID}`;
+/* ============================================================
+   Joli Monitoring — Marketing Dashboard
+   Connected to Google Sheets (Daily Performance)
+============================================================ */
 
-// ترتيب الأعمدة المتوقع (بناء على الفحص)
-// ملاحظة: الفهارس تبدأ من 0
+const SHEET_ID  = "18pvf_fuBjtBdYX4CAFgFCAmaYIRLpVGzsG_0FX0LqfY";
+const SHEET_GID = "1602116591"; // Daily Performance
+const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${SHEET_GID}`;
+
+/* === Column indexes (0-based) — verified from sheet structure === */
 const COL = {
   year: 1, month: 2, day: 3,
-  ctr: 5, orders: 6, cr: 7, costOrder: 8, aov: 9,
-  totalSpend: 10, totalRevenue: 11, accountRevenue: 12, roas: 13,
+  webTraffic: 5, imp: 6, click: 7, ctr: 8,
+  orders: 9, cr: 10, costOrder: 11, aov: 12,
+  totalSpend: 14, totalRevenue: 15, accountRevenue: 16, roas: 17,
   channels: {
-    "Google Ads":  { spend:14, imp:15, click:16, trans:17, revenue:18, roas:19 },
-    "Snapchat":    { spend:20, imp:21, click:22, trans:23, revenue:24, roas:25 },
-    "Meta":        { spend:26, imp:27, click:28, trans:29, revenue:30, roas:31 },
-    "Influencer":  { spend:44, imp:45, click:46, trans:47, revenue:48, roas:49 },
-    "Whatsapp":    { spend:50, imp:51, click:52, trans:53, revenue:54, roas:55 }
+    "Google Ads":   { spend:19, imp:20, click:21, trans:22, revenue:23, roas:24, color:"#3b82f6" },
+    "Snapchat":     { spend:26, imp:27, click:28, trans:29, revenue:30, roas:31, color:"#facc15" },
+    "Meta":         { spend:33, imp:34, click:35, trans:36, revenue:37, roas:38, color:"#1877f2" },
+    "TikTok":       { spend:40, imp:41, click:42, trans:43, revenue:44, roas:45, color:"#ec4899" },
+    "TikTok Govyy": { spend:47, imp:null, click:null, trans:null, revenue:48, roas:49, color:"#a855f7" },
+    "Influencer":   { spend:51, imp:52, click:53, trans:54, revenue:55, roas:56, color:"#10b981" },
+    "WhatsApp":     { spend:58, imp:59, click:60, trans:61, revenue:62, roas:63, color:"#22c55e" }
   }
 };
 
 let RAW_ROWS = [];
+let ACTIVE_CHANNELS = new Set(Object.keys(COL.channels));
 let CHARTS = {};
+let CURRENT_TAB = "overview";
+let CURRENT_PERIOD = "all";
+let GROUP_BY = "day";
 
-// ====== أدوات مساعدة ======
+/* ============================================================
+   Helpers
+============================================================ */
 const num = v => {
-  if (v == null) return 0;
-  const n = parseFloat(String(v).replace(/[,٬\s%]/g,""));
+  if (v == null || v === "") return 0;
+  const n = parseFloat(String(v).replace(/[,٬\s%"$]/g, ""));
   return isNaN(n) ? 0 : n;
 };
-const fmt = (n, d=0) => n.toLocaleString("en-US",{maximumFractionDigits:d});
+const fmt = (n, d=0) => Number(n||0).toLocaleString("en-US",{maximumFractionDigits:d});
 const fmtMoney = n => fmt(n,0);
+const fmtPct = n => (n*100).toFixed(2)+"%";
 
-// ====== جلب البيانات ======
-async function loadData() {
-  const res = await fetch(SHEET_URL + "&_=" + Date.now());
-  const text = await res.text();
-  const parsed = Papa.parse(text, { skipEmptyLines: true });
-  // أول صفين headers — نتجاوزهم
-  const dataRows = parsed.data.slice(2).filter(r =>
-    r[COL.day] && /\d{1,2}\/[A-Za-z]+\/\d{4}/.test(r[COL.day])
-  );
-  RAW_ROWS = dataRows;
-  document.getElementById("lastUpdate").textContent =
-    "آخر تحديث: " + new Date().toLocaleString("ar-EG");
-  render();
+/* Parse date "01/Apr/2026" → Date object */
+function parseRowDate(str){
+  if(!str) return null;
+  const m = String(str).match(/(\d{1,2})\/([A-Za-z]+)\/(\d{4})/);
+  if(!m) return null;
+  const months = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+  return new Date(+m[3], months[m[2]] ?? 0, +m[1]);
 }
 
-// ====== فلترة الفترة ======
-function filterByPeriod(rows) {
-  const v = document.getElementById("periodFilter").value;
-  if (v === "all") return rows;
-  const days = v === "week" ? 7 : 30;
-  return rows.slice(-days);
+/* Δ% formatter */
+function setDelta(id, current, previous, invert=false){
+  const el = document.getElementById(id);
+  if(!el) return;
+  if(!previous){ el.textContent=""; return; }
+  const pct = ((current-previous)/Math.abs(previous))*100;
+  const up  = invert ? pct < 0 : pct > 0;
+  const arrow = pct>0?"▲":(pct<0?"▼":"●");
+  el.className = "kpi-delta " + (Math.abs(pct)<0.01 ? "flat" : (up?"up":"down"));
+  el.textContent = `${arrow} ${Math.abs(pct).toFixed(1)}% مقارنة بالفترة السابقة`;
 }
 
-// ====== الرسم ======
-function render() {
-  const rows = filterByPeriod(RAW_ROWS);
+/* ============================================================
+   Load data from Google Sheets
+============================================================ */
+async function loadData(){
+  try{
+    const res = await fetch(SHEET_URL + "&_=" + Date.now());
+    const text = await res.text();
+    const parsed = Papa.parse(text, { skipEmptyLines:true });
+    RAW_ROWS = parsed.data.filter(r => r[COL.day] && parseRowDate(r[COL.day]));
+    document.getElementById("lastUpdate").textContent =
+      "آخر تحديث: " + new Date().toLocaleString("ar-EG");
+    render();
+  }catch(e){
+    console.error("Sheet load failed:", e);
+    alert("تعذر جلب البيانات. تأكد أن الشيت Public.");
+  }
+}
 
-  // === مجاميع KPI ===
-  const totalSpend   = rows.reduce((s,r)=>s+num(r[COL.totalSpend]),0);
-  const totalRevenue = rows.reduce((s,r)=>s+num(r[COL.totalRevenue]),0);
-  const totalOrders  = rows.reduce((s,r)=>s+num(r[COL.orders]),0);
-  const roas   = totalSpend ? totalRevenue/totalSpend : 0;
-  const aov    = totalOrders ? totalRevenue/totalOrders : 0;
-  const cpo    = totalOrders ? totalSpend/totalOrders : 0;
-  const avgCtr = rows.reduce((s,r)=>s+num(r[COL.ctr]),0)/(rows.length||1);
-  const avgCr  = rows.reduce((s,r)=>s+num(r[COL.cr]),0)/(rows.length||1);
+/* ============================================================
+   Filtering
+============================================================ */
+function getFilteredRows(){
+  let rows = RAW_ROWS.slice();
+  // sort by date
+  rows.sort((a,b) => parseRowDate(a[COL.day]) - parseRowDate(b[COL.day]));
 
-  document.getElementById("kpiSpend").textContent   = fmtMoney(totalSpend);
-  document.getElementById("kpiRevenue").textContent = fmtMoney(totalRevenue);
-  document.getElementById("kpiRoas").textContent    = roas.toFixed(2)+"x";
-  document.getElementById("kpiOrders").textContent  = fmtMoney(totalOrders);
-  document.getElementById("kpiAov").textContent     = fmtMoney(aov);
-  document.getElementById("kpiCr").textContent      = (avgCr*100).toFixed(2)+"%";
-  document.getElementById("kpiCtr").textContent     = (avgCtr*100).toFixed(2)+"%";
-  document.getElementById("kpiCpo").textContent     = fmtMoney(cpo);
+  if(CURRENT_PERIOD === "all") return rows;
 
-  // === Trend Chart ===
-  const labels = rows.map(r => r[COL.day]);
-  const spendSeries   = rows.map(r => num(r[COL.totalSpend]));
-  const revenueSeries = rows.map(r => num(r[COL.totalRevenue]));
-  drawChart("trendChart","line",{
-    labels,
-    datasets:[
-      {label:"Spend",   data:spendSeries,   borderColor:"#f87171", backgroundColor:"rgba(248,113,113,.15)", tension:.3, fill:true},
-      {label:"Revenue", data:revenueSeries, borderColor:"#34d399", backgroundColor:"rgba(52,211,153,.15)", tension:.3, fill:true}
-    ]
-  });
+  const today = parseRowDate(rows[rows.length-1]?.[COL.day]) || new Date();
+  let cutoff = new Date(today);
 
-  // === القنوات: مجاميع ===
-  const channelTotals = {};
-  for (const [name, c] of Object.entries(COL.channels)) {
-    channelTotals[name] = {
-      spend:   rows.reduce((s,r)=>s+num(r[c.spend]),0),
-      imp:     rows.reduce((s,r)=>s+num(r[c.imp]),0),
-      click:   rows.reduce((s,r)=>s+num(r[c.click]),0),
-      trans:   rows.reduce((s,r)=>s+num(r[c.trans]),0),
-      revenue: rows.reduce((s,r)=>s+num(r[c.revenue]),0)
-    };
-    channelTotals[name].roas = channelTotals[name].spend
-      ? channelTotals[name].revenue/channelTotals[name].spend : 0;
+  if(CURRENT_PERIOD === "day")     cutoff.setDate(today.getDate()-1);
+  if(CURRENT_PERIOD === "week")    cutoff.setDate(today.getDate()-7);
+  if(CURRENT_PERIOD === "month")   cutoff.setDate(today.getDate()-30);
+  if(CURRENT_PERIOD === "quarter") cutoff.setDate(today.getDate()-90);
+
+  if(CURRENT_PERIOD === "custom"){
+    const f = document.getElementById("dateFrom").value;
+    const t = document.getElementById("dateTo").value;
+    if(!f || !t) return rows;
+    const from = new Date(f), to = new Date(t);
+    return rows.filter(r => {
+      const d = parseRowDate(r[COL.day]);
+      return d >= from && d <= to;
+    });
   }
 
-  const chNames = Object.keys(channelTotals);
-  const palette = ["#38bdf8","#a78bfa","#f472b6","#fbbf24","#34d399"];
-
-  drawChart("spendChannelChart","doughnut",{
-    labels: chNames,
-    datasets:[{ data: chNames.map(n=>channelTotals[n].spend), backgroundColor: palette }]
-  });
-  drawChart("revenueChannelChart","bar",{
-    labels: chNames,
-    datasets:[{ label:"Revenue", data: chNames.map(n=>channelTotals[n].revenue), backgroundColor:"#34d399" }]
-  });
-  drawChart("roasChannelChart","bar",{
-    labels: chNames,
-    datasets:[{ label:"ROAS", data: chNames.map(n=>+channelTotals[n].roas.toFixed(2)), backgroundColor:"#38bdf8" }]
-  });
-
-  // === الجدول ===
-  const tbody = document.querySelector("#channelTable tbody");
-  tbody.innerHTML = chNames.map(n=>{
-    const c = channelTotals[n];
-    return `<tr><td>${n}</td><td>${fmtMoney(c.spend)}</td><td>${fmtMoney(c.imp)}</td>
-            <td>${fmtMoney(c.click)}</td><td>${fmtMoney(c.trans)}</td>
-            <td>${fmtMoney(c.revenue)}</td><td>${c.roas.toFixed(2)}x</td></tr>`;
-  }).join("");
+  return rows.filter(r => parseRowDate(r[COL.day]) >= cutoff);
 }
 
-function drawChart(id, type, data) {
-  if (CHARTS[id]) CHARTS[id].destroy();
-  const ctx = document.getElementById(id).getContext("2d");
-  CHARTS[id] = new Chart(ctx, {
-    type, data,
-    options:{
-      responsive:true, maintainAspectRatio:false,
-      plugins:{ legend:{ labels:{ color:"#cbd5e1" } } },
-      scales: type === "doughnut" ? {} : {
-        x:{ ticks:{ color:"#94a3b8" }, grid:{ color:"#1e293b" } },
-        y:{ ticks:{ color:"#94a3b8" }, grid:{ color:"#1e293b" } }
-      }
-    }
-  });
-}
-
-document.getElementById("refreshBtn").addEventListener("click", loadData);
-document.getElementById("periodFilter").addEventListener("change", render);
-
-loadData();
+/* Previous-period rows for Δ% */
+function getPreviousPeriodRows(rows){
+  if(!rows.length) return [];
+  const first = parseRowDate(rows[0][COL.day]);
+  const last  = parseRowDate(rows[rows.length-1][COL.day]);
+  const days  = Math.max(1, Math.round((last-first)/86400000)
