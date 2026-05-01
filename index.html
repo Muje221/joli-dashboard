@@ -5,53 +5,252 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Joli Monitoring — Marketing Dashboard</title>
 <link rel="stylesheet" href="style.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 </head>
 <body>
-  <header>
-    <h1>📊 Joli Monitoring — لوحة التسويق الرقمي</h1>
-    <div class="controls">
-      <label>الفترة:
-        <select id="periodFilter">
-          <option value="all">كل الفترات</option>
-          <option value="month">آخر شهر</option>
-          <option value="week">آخر 7 أيام</option>
-        </select>
-      </label>
-      <button id="refreshBtn">🔄 تحديث</button>
-      <span id="lastUpdate"></span>
+
+<div class="app">
+
+  <!-- ============ Sidebar ============ -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">J</div>
+      <div class="brand-text">
+        <h2>Joli</h2>
+        <span>Monitoring</span>
+      </div>
     </div>
-  </header>
 
-  <section class="kpi-grid">
-    <div class="kpi-card"><span class="label">إجمالي الإنفاق</span><span class="value" id="kpiSpend">—</span></div>
-    <div class="kpi-card"><span class="label">إجمالي الإيرادات</span><span class="value" id="kpiRevenue">—</span></div>
-    <div class="kpi-card"><span class="label">ROAS</span><span class="value" id="kpiRoas">—</span></div>
-    <div class="kpi-card"><span class="label">إجمالي الطلبات</span><span class="value" id="kpiOrders">—</span></div>
-    <div class="kpi-card"><span class="label">متوسط قيمة الطلب (AOV)</span><span class="value" id="kpiAov">—</span></div>
-    <div class="kpi-card"><span class="label">معدل التحويل (CR)</span><span class="value" id="kpiCr">—</span></div>
-    <div class="kpi-card"><span class="label">CTR</span><span class="value" id="kpiCtr">—</span></div>
-    <div class="kpi-card"><span class="label">تكلفة الطلب</span><span class="value" id="kpiCpo">—</span></div>
-  </section>
+    <nav class="nav">
+      <button class="nav-item active" data-tab="overview">
+        <span class="ic">📊</span><span>نظرة عامة</span>
+      </button>
+      <button class="nav-item" data-tab="marketing">
+        <span class="ic">🎯</span><span>أداء التسويق</span>
+      </button>
+      <button class="nav-item" data-tab="funnel">
+        <span class="ic">🔻</span><span>قمع التحويل</span>
+      </button>
+    </nav>
 
-  <section class="charts">
-    <div class="chart-box"><h3>الإنفاق مقابل الإيرادات (يومي)</h3><canvas id="trendChart"></canvas></div>
-    <div class="chart-box"><h3>توزيع الإنفاق حسب القناة</h3><canvas id="spendChannelChart"></canvas></div>
-    <div class="chart-box"><h3>ROAS لكل قناة</h3><canvas id="roasChannelChart"></canvas></div>
-    <div class="chart-box"><h3>الإيرادات حسب القناة</h3><canvas id="revenueChannelChart"></canvas></div>
-  </section>
+    <div class="sidebar-footer">
+      <div class="status-dot"></div>
+      <span>متصل بالشيت</span>
+    </div>
+  </aside>
 
-  <section class="table-box">
-    <h3>أداء القنوات (إجمالي الفترة)</h3>
-    <table id="channelTable">
-      <thead><tr><th>القناة</th><th>الإنفاق</th><th>الظهور</th><th>النقرات</th><th>المعاملات</th><th>الإيرادات</th><th>ROAS</th></tr></thead>
-      <tbody></tbody>
-    </table>
-  </section>
+  <!-- ============ Main ============ -->
+  <main class="main">
 
-  <footer>مصدر البيانات: Google Sheets — Joli Monitoring</footer>
+    <!-- Top Bar -->
+    <header class="topbar">
+      <div class="title-block">
+        <h1 id="pageTitle">نظرة عامة على الأداء</h1>
+        <p id="pageSubtitle">ملخص شامل لأداء التسويق والمبيعات</p>
+      </div>
+      <div class="actions">
+        <span id="lastUpdate" class="last-update">—</span>
+        <button id="refreshBtn" class="btn-primary">🔄 تحديث</button>
+      </div>
+    </header>
 
-  <script src="app.js"></script>
+    <!-- Filter Bar -->
+    <section class="filter-bar">
+      <div class="filter-group">
+        <label>الفترة</label>
+        <div class="period-tabs">
+          <button class="period-btn active" data-period="all">الكل</button>
+          <button class="period-btn" data-period="day">اليوم</button>
+          <button class="period-btn" data-period="week">أسبوع</button>
+          <button class="period-btn" data-period="month">شهر</button>
+          <button class="period-btn" data-period="quarter">ربع</button>
+          <button class="period-btn" data-period="custom">مخصص</button>
+        </div>
+      </div>
+
+      <div class="filter-group date-range" id="dateRangeWrap" style="display:none">
+        <label>من</label>
+        <input type="date" id="dateFrom">
+        <label>إلى</label>
+        <input type="date" id="dateTo">
+      </div>
+
+      <div class="filter-group">
+        <label>التجميع</label>
+        <select id="groupBy">
+          <option value="day">يومي</option>
+          <option value="week">أسبوعي</option>
+          <option value="month">شهري</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label>القنوات</label>
+        <div class="channel-chips" id="channelChips"></div>
+      </div>
+    </section>
+
+    <!-- ===== TAB: Overview ===== -->
+    <section class="tab-content active" data-tab-content="overview">
+      <div class="kpi-grid">
+        <div class="kpi-card accent-blue">
+          <span class="kpi-label">إجمالي الإنفاق</span>
+          <span class="kpi-value" id="kpiSpend">—</span>
+          <span class="kpi-delta" id="kpiSpendDelta"></span>
+        </div>
+        <div class="kpi-card accent-green">
+          <span class="kpi-label">إجمالي الإيرادات</span>
+          <span class="kpi-value" id="kpiRevenue">—</span>
+          <span class="kpi-delta" id="kpiRevenueDelta"></span>
+        </div>
+        <div class="kpi-card accent-purple">
+          <span class="kpi-label">ROAS</span>
+          <span class="kpi-value" id="kpiRoas">—</span>
+          <span class="kpi-delta" id="kpiRoasDelta"></span>
+        </div>
+        <div class="kpi-card accent-orange">
+          <span class="kpi-label">الطلبات</span>
+          <span class="kpi-value" id="kpiOrders">—</span>
+          <span class="kpi-delta" id="kpiOrdersDelta"></span>
+        </div>
+        <div class="kpi-card accent-cyan">
+          <span class="kpi-label">متوسط قيمة الطلب</span>
+          <span class="kpi-value" id="kpiAov">—</span>
+          <span class="kpi-delta" id="kpiAovDelta"></span>
+        </div>
+        <div class="kpi-card accent-pink">
+          <span class="kpi-label">معدل التحويل</span>
+          <span class="kpi-value" id="kpiCr">—</span>
+          <span class="kpi-delta" id="kpiCrDelta"></span>
+        </div>
+        <div class="kpi-card accent-yellow">
+          <span class="kpi-label">CTR</span>
+          <span class="kpi-value" id="kpiCtr">—</span>
+          <span class="kpi-delta" id="kpiCtrDelta"></span>
+        </div>
+        <div class="kpi-card accent-red">
+          <span class="kpi-label">تكلفة الطلب</span>
+          <span class="kpi-value" id="kpiCpo">—</span>
+          <span class="kpi-delta" id="kpiCpoDelta"></span>
+        </div>
+      </div>
+
+      <div class="charts-grid">
+        <div class="chart-card span-2">
+          <div class="chart-head">
+            <h3>الإنفاق مقابل الإيرادات</h3>
+            <span class="muted">حسب الفترة المختارة</span>
+          </div>
+          <canvas id="trendChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="chart-head"><h3>توزيع الإنفاق</h3></div>
+          <canvas id="spendDonut"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="chart-head"><h3>توزيع الإيرادات</h3></div>
+          <canvas id="revenueDonut"></canvas>
+        </div>
+        <div class="chart-card span-2">
+          <div class="chart-head"><h3>تطور ROAS عبر الزمن</h3></div>
+          <canvas id="roasTrend"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== TAB: Marketing ===== -->
+    <section class="tab-content" data-tab-content="marketing">
+      <div class="charts-grid">
+        <div class="chart-card span-2">
+          <div class="chart-head"><h3>الإنفاق والإيرادات لكل قناة</h3></div>
+          <canvas id="channelComboChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="chart-head"><h3>ROAS لكل قناة</h3></div>
+          <canvas id="roasChannelChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="chart-head"><h3>عدد الطلبات لكل قناة</h3></div>
+          <canvas id="ordersChannelChart"></canvas>
+        </div>
+        <div class="chart-card span-2">
+          <div class="chart-head"><h3>كفاءة القنوات (CTR vs CR)</h3></div>
+          <canvas id="efficiencyChart"></canvas>
+        </div>
+      </div>
+
+      <div class="table-card">
+        <div class="chart-head">
+          <h3>تفصيل أداء القنوات</h3>
+          <span class="muted" id="channelTableHint">إجمالي الفترة المختارة</span>
+        </div>
+        <div class="table-wrap">
+          <table id="channelTable">
+            <thead>
+              <tr>
+                <th>القناة</th>
+                <th>الإنفاق</th>
+                <th>الظهور</th>
+                <th>النقرات</th>
+                <th>CTR</th>
+                <th>الطلبات</th>
+                <th>CR</th>
+                <th>الإيرادات</th>
+                <th>ROAS</th>
+                <th>الحالة</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== TAB: Funnel ===== -->
+    <section class="tab-content" data-tab-content="funnel">
+      <div class="kpi-grid funnel-kpis">
+        <div class="kpi-card accent-blue">
+          <span class="kpi-label">الزيارات (Sessions)</span>
+          <span class="kpi-value" id="fnTraffic">—</span>
+        </div>
+        <div class="kpi-card accent-cyan">
+          <span class="kpi-label">إجمالي الطلبات</span>
+          <span class="kpi-value" id="fnOrders">—</span>
+        </div>
+        <div class="kpi-card accent-green">
+          <span class="kpi-label">معدل التحويل</span>
+          <span class="kpi-value" id="fnCr">—</span>
+        </div>
+        <div class="kpi-card accent-orange">
+          <span class="kpi-label">متوسط قيمة الطلب</span>
+          <span class="kpi-value" id="fnAov">—</span>
+        </div>
+      </div>
+
+      <div class="charts-grid">
+        <div class="chart-card span-2">
+          <div class="chart-head"><h3>قمع التحويل</h3></div>
+          <canvas id="funnelChart"></canvas>
+        </div>
+        <div class="chart-card span-2">
+          <div class="chart-head"><h3>الطلبات اليومية</h3></div>
+          <canvas id="ordersTrend"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <span>© Joli Monitoring</span>
+      <span>•</span>
+      <span>مصدر البيانات: Google Sheets</span>
+    </footer>
+
+  </main>
+</div>
+
+<script src="app.js"></script>
 </body>
 </html>
