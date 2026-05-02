@@ -19,7 +19,7 @@ const COL = {
     "Snapchat":     { spend:26, imp:27, click:28, trans:29, revenue:30, roas:31, color:"#facc15" },
     "Meta":         { spend:33, imp:34, click:35, trans:36, revenue:37, roas:38, color:"#1877f2" },
     "TikTok":       { spend:40, imp:41, click:42, trans:43, revenue:44, roas:45, color:"#ec4899" },
-    "TikTok Govyy": { spend:47, imp:null, click:null, trans:null, revenue:48, roas:49, color:"#a855f7" },
+    "X": { spend:47, imp:null, click:null, trans:null, revenue:48, roas:49, color:"#a855f7" },
     "Influencer":   { spend:51, imp:52, click:53, trans:54, revenue:55, roas:56, color:"#10b981" },
     "WhatsApp":     { spend:58, imp:59, click:60, trans:61, revenue:62, roas:63, color:"#22c55e" }
   }
