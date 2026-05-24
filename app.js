@@ -12,6 +12,8 @@ const SHEET_EXPORT     = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/exp
 const SHEET_EXPORT_0   = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=0`;
 const SHEET_GVIZ_FULL  = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${SHEET_GID}&headers=1`;
 const SHEET_GVIZ_SEL   = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${SHEET_GID}&tq=${encodeURIComponent("select *")}`;
+// Published-to-web URL (bypasses filters & auth, works if sheet is published)
+const SHEET_PUB        = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/pub?output=csv&gid=${SHEET_GID}`;
 
 // Keep legacy alias used elsewhere
 const SHEET_URL        = SHEET_EXPORT;
@@ -130,10 +132,11 @@ async function loadData(){
   // export?format=csv bypasses Google Sheets filter views → returns ALL rows.
   // gviz?select * respects filter views → may return only visible/current-month rows.
   const urlsToTry = [
-    { label:"export GID",    url: SHEET_EXPORT    },
-    { label:"export GID=0",  url: SHEET_EXPORT_0  },
-    { label:"gviz no-tq",    url: SHEET_GVIZ_FULL },
-    { label:"gviz select *", url: SHEET_GVIZ_SEL  },
+    { label:"export GID",       url: SHEET_EXPORT    },
+    { label:"export GID=0",     url: SHEET_EXPORT_0  },
+    { label:"pub output=csv",   url: SHEET_PUB       },
+    { label:"gviz no-tq",       url: SHEET_GVIZ_FULL },
+    { label:"gviz select *",    url: SHEET_GVIZ_SEL  },
   ];
 
   let bestRows = [];
