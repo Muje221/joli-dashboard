@@ -2,253 +2,423 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
 <title>Joli Monitoring — Marketing Dashboard</title>
 <link rel="stylesheet" href="style.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Almarai:wght@300;400;700;800&family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 </head>
 <body>
 
-<div class="app">
+<div class="bg-orbs" aria-hidden="true">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+</div>
 
-  <!-- ============ Sidebar ============ -->
-  <aside class="sidebar">
-    <div class="brand">
-      <div class="logo">J</div>
-      <div class="brand-text">
-        <h2>Joli</h2>
-        <span>Monitoring</span>
+<div class="app" id="appRoot">
+
+  <!-- ======= Sidebar ======= -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-inner">
+      <div class="brand">
+        <div class="logo">
+          <span class="logo-letter">J</span>
+          <div class="logo-ring"></div>
+        </div>
+        <div class="brand-text">
+          <h2>Joli</h2>
+          <span>Monitoring</span>
+        </div>
       </div>
-    </div>
 
-    <nav class="nav">
-      <button class="nav-item active" data-tab="overview">
-        <span class="ic">📊</span><span>نظرة عامة</span>
-      </button>
-      <button class="nav-item" data-tab="marketing">
-        <span class="ic">🎯</span><span>أداء التسويق</span>
-      </button>
-      <button class="nav-item" data-tab="funnel">
-        <span class="ic">🔻</span><span>قمع التحويل</span>
-      </button>
-    </nav>
+      <nav class="nav" role="navigation">
+        <button class="nav-item active" data-tab="overview">
+          <span class="nav-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          </span>
+          <span class="nav-label">نظرة عامة</span>
+        </button>
+        <button class="nav-item" data-tab="marketing">
+          <span class="nav-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          </span>
+          <span class="nav-label">أداء التسويق</span>
+        </button>
+        <button class="nav-item" data-tab="funnel">
+          <span class="nav-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 3H2l8 9.46V19l4 2V12.46L22 3z"/></svg>
+          </span>
+          <span class="nav-label">قمع التحويل</span>
+        </button>
+      </nav>
 
-    <div class="sidebar-footer">
-      <div class="status-dot"></div>
-      <span>متصل بالشيت</span>
+      <div class="sidebar-bottom">
+        <div class="live-badge">
+          <span class="live-dot"></span>
+          <span>مباشر</span>
+        </div>
+        <div id="lastUpdateSidebar" class="last-update-sidebar">—</div>
+      </div>
     </div>
   </aside>
 
-  <!-- ============ Main ============ -->
-  <main class="main">
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <!-- ======= Main ======= -->
+  <main class="main" id="mainContent">
 
     <!-- Top Bar -->
     <header class="topbar">
-      <div class="title-block">
-        <h1 id="pageTitle">نظرة عامة على الأداء</h1>
-        <p id="pageSubtitle">ملخص شامل لأداء التسويق والمبيعات</p>
+      <div class="topbar-right">
+        <button class="hamburger" id="hamburgerBtn" aria-label="القائمة" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+        <div class="title-block">
+          <h1 id="pageTitle">نظرة عامة على الأداء</h1>
+          <p id="pageSubtitle">ملخص شامل لأداء التسويق والمبيعات</p>
+        </div>
       </div>
-      <div class="actions">
-        <span id="lastUpdate" class="last-update">—</span>
-        <button id="refreshBtn" class="btn-primary">🔄 تحديث</button>
+      <div class="topbar-actions">
+        <span id="lastUpdate" class="last-update-top">—</span>
+        <button id="exportBtn" class="btn-ghost">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span class="btn-label">تصدير</span>
+        </button>
+        <button id="refreshBtn" class="btn-primary">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          <span class="btn-label">تحديث</span>
+        </button>
       </div>
     </header>
 
     <!-- Filter Bar -->
-    <section class="filter-bar">
-      <div class="filter-group">
-        <label>الفترة</label>
-        <div class="period-tabs">
-          <button class="period-btn active" data-period="all">الكل</button>
-          <button class="period-btn" data-period="day">اليوم</button>
-          <button class="period-btn" data-period="week">أسبوع</button>
-          <button class="period-btn" data-period="month">شهر</button>
-          <button class="period-btn" data-period="quarter">ربع</button>
-          <button class="period-btn" data-period="custom">مخصص</button>
+    <section class="filter-bar" id="filterBar">
+
+      <div class="filter-row">
+        <div class="filter-group">
+          <label class="filter-label">الفترة الزمنية</label>
+          <div class="period-tabs">
+            <button class="period-btn active" data-period="all">الكل</button>
+            <button class="period-btn" data-period="day">اليوم</button>
+            <button class="period-btn" data-period="week">أسبوع</button>
+            <button class="period-btn" data-period="month">شهر</button>
+            <button class="period-btn" data-period="quarter">ربع سنة</button>
+            <button class="period-btn" data-period="custom">مخصص ✦</button>
+          </div>
+        </div>
+
+        <div class="filter-group">
+          <label class="filter-label">التجميع</label>
+          <div class="select-wrap">
+            <select id="groupBy">
+              <option value="day">يومي</option>
+              <option value="week">أسبوعي</option>
+              <option value="month">شهري</option>
+            </select>
+            <svg class="select-arrow" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+        </div>
+
+        <div class="filter-group">
+          <label class="filter-label">مقارنة بالفترة السابقة</label>
+          <label class="toggle-switch">
+            <input type="checkbox" id="compareToggle">
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          </label>
+        </div>
+
+        <div class="filter-group" id="trendMetricGroup">
+          <label class="filter-label">مقياس المخطط الرئيسي</label>
+          <div class="select-wrap">
+            <select id="trendMetric">
+              <option value="both">الإنفاق والإيرادات</option>
+              <option value="spend">الإنفاق</option>
+              <option value="revenue">الإيرادات</option>
+              <option value="roas">ROAS</option>
+              <option value="orders">الطلبات</option>
+            </select>
+            <svg class="select-arrow" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
         </div>
       </div>
 
-      <div class="filter-group date-range" id="dateRangeWrap" style="display:none">
-        <label>من</label>
-        <input type="date" id="dateFrom">
-        <label>إلى</label>
-        <input type="date" id="dateTo">
+      <div class="filter-row date-range-row" id="dateRangeWrap" style="display:none">
+        <div class="filter-group">
+          <label class="filter-label">من</label>
+          <input type="date" id="dateFrom" class="date-input">
+        </div>
+        <div class="filter-group">
+          <label class="filter-label">إلى</label>
+          <input type="date" id="dateTo" class="date-input">
+        </div>
       </div>
 
-      <div class="filter-group">
-        <label>التجميع</label>
-        <select id="groupBy">
-          <option value="day">يومي</option>
-          <option value="week">أسبوعي</option>
-          <option value="month">شهري</option>
-        </select>
+      <div class="filter-row channels-row">
+        <div class="filter-group flex-1">
+          <label class="filter-label">القنوات</label>
+          <div class="channel-chips" id="channelChips"></div>
+        </div>
+        <div class="filter-group">
+          <label class="filter-label">أفضل القنوات</label>
+          <div class="topn-tabs">
+            <button class="topn-btn active" data-topn="all">الكل</button>
+            <button class="topn-btn" data-topn="3">أفضل 3</button>
+            <button class="topn-btn" data-topn="5">أفضل 5</button>
+          </div>
+        </div>
       </div>
 
-      <div class="filter-group">
-        <label>القنوات</label>
-        <div class="channel-chips" id="channelChips"></div>
-      </div>
     </section>
 
+    <!-- Skeleton Loader -->
+    <div class="skeleton-overlay" id="skeletonOverlay">
+      <div class="skeleton-kpi-grid">
+        <div class="skeleton-card" style="--d:0s"></div>
+        <div class="skeleton-card" style="--d:.06s"></div>
+        <div class="skeleton-card" style="--d:.12s"></div>
+        <div class="skeleton-card" style="--d:.18s"></div>
+        <div class="skeleton-card" style="--d:.24s"></div>
+        <div class="skeleton-card" style="--d:.30s"></div>
+        <div class="skeleton-card" style="--d:.36s"></div>
+        <div class="skeleton-card" style="--d:.42s"></div>
+      </div>
+      <div class="skeleton-chart-row">
+        <div class="skeleton-chart wide" style="--d:.15s"></div>
+        <div class="skeleton-chart" style="--d:.25s"></div>
+        <div class="skeleton-chart" style="--d:.30s"></div>
+      </div>
+    </div>
+
     <!-- ===== TAB: Overview ===== -->
-    <section class="tab-content active" data-tab-content="overview">
+    <section class="tab-content active" data-tab-content="overview" id="tab-overview">
       <div class="kpi-grid">
         <div class="kpi-card accent-blue">
-          <span class="kpi-label">إجمالي الإنفاق</span>
-          <span class="kpi-value" id="kpiSpend">—</span>
-          <span class="kpi-delta" id="kpiSpendDelta"></span>
+          <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+          <div class="kpi-content">
+            <span class="kpi-label">إجمالي الإنفاق</span>
+            <span class="kpi-value" id="kpiSpend">—</span>
+            <span class="kpi-delta" id="kpiSpendDelta"></span>
+          </div>
+          <div class="kpi-glow"></div>
         </div>
         <div class="kpi-card accent-green">
-          <span class="kpi-label">إجمالي الإيرادات</span>
-          <span class="kpi-value" id="kpiRevenue">—</span>
-          <span class="kpi-delta" id="kpiRevenueDelta"></span>
+          <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></div>
+          <div class="kpi-content">
+            <span class="kpi-label">إجمالي الإيرادات</span>
+            <span class="kpi-value" id="kpiRevenue">—</span>
+            <span class="kpi-delta" id="kpiRevenueDelta"></span>
+          </div>
+          <div class="kpi-glow"></div>
         </div>
         <div class="kpi-card accent-purple">
-          <span class="kpi-label">ROAS</span>
-          <span class="kpi-value" id="kpiRoas">—</span>
-          <span class="kpi-delta" id="kpiRoasDelta"></span>
+          <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+          <div class="kpi-content">
+            <span class="kpi-label">ROAS</span>
+            <span class="kpi-value" id="kpiRoas">—</span>
+            <span class="kpi-delta" id="kpiRoasDelta"></span>
+          </div>
+          <div class="kpi-glow"></div>
         </div>
         <div class="kpi-card accent-orange">
-          <span class="kpi-label">الطلبات</span>
-          <span class="kpi-value" id="kpiOrders">—</span>
-          <span class="kpi-delta" id="kpiOrdersDelta"></span>
+          <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></div>
+          <div class="kpi-content">
+            <span class="kpi-label">الطلبات</span>
+            <span class="kpi-value" id="kpiOrders">—</span>
+            <span class="kpi-delta" id="kpiOrdersDelta"></span>
+          </div>
+          <div class="kpi-glow"></div>
         </div>
         <div class="kpi-card accent-cyan">
-          <span class="kpi-label">متوسط قيمة الطلب</span>
-          <span class="kpi-value" id="kpiAov">—</span>
-          <span class="kpi-delta" id="kpiAovDelta"></span>
+          <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div>
+          <div class="kpi-content">
+            <span class="kpi-label">متوسط قيمة الطلب</span>
+            <span class="kpi-value" id="kpiAov">—</span>
+            <span class="kpi-delta" id="kpiAovDelta"></span>
+          </div>
+          <div class="kpi-glow"></div>
         </div>
         <div class="kpi-card accent-pink">
-          <span class="kpi-label">معدل التحويل</span>
-          <span class="kpi-value" id="kpiCr">—</span>
-          <span class="kpi-delta" id="kpiCrDelta"></span>
+          <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+          <div class="kpi-content">
+            <span class="kpi-label">معدل التحويل</span>
+            <span class="kpi-value" id="kpiCr">—</span>
+            <span class="kpi-delta" id="kpiCrDelta"></span>
+          </div>
+          <div class="kpi-glow"></div>
         </div>
         <div class="kpi-card accent-yellow">
-          <span class="kpi-label">CTR</span>
-          <span class="kpi-value" id="kpiCtr">—</span>
-          <span class="kpi-delta" id="kpiCtrDelta"></span>
+          <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></div>
+          <div class="kpi-content">
+            <span class="kpi-label">CTR</span>
+            <span class="kpi-value" id="kpiCtr">—</span>
+            <span class="kpi-delta" id="kpiCtrDelta"></span>
+          </div>
+          <div class="kpi-glow"></div>
         </div>
         <div class="kpi-card accent-red">
-          <span class="kpi-label">تكلفة الطلب</span>
-          <span class="kpi-value" id="kpiCpo">—</span>
-          <span class="kpi-delta" id="kpiCpoDelta"></span>
+          <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+          <div class="kpi-content">
+            <span class="kpi-label">تكلفة الطلب</span>
+            <span class="kpi-value" id="kpiCpo">—</span>
+            <span class="kpi-delta" id="kpiCpoDelta"></span>
+          </div>
+          <div class="kpi-glow"></div>
         </div>
       </div>
 
       <div class="charts-grid">
         <div class="chart-card span-2">
           <div class="chart-head">
-            <h3>الإنفاق مقابل الإيرادات</h3>
-            <span class="muted">حسب الفترة المختارة</span>
+            <div><h3>الإنفاق مقابل الإيرادات</h3><span class="chart-sub">حسب الفترة المختارة</span></div>
           </div>
-          <canvas id="trendChart"></canvas>
+          <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
         </div>
         <div class="chart-card">
           <div class="chart-head"><h3>توزيع الإنفاق</h3></div>
-          <canvas id="spendDonut"></canvas>
+          <div class="chart-wrap donut-wrap"><canvas id="spendDonut"></canvas></div>
         </div>
         <div class="chart-card">
           <div class="chart-head"><h3>توزيع الإيرادات</h3></div>
-          <canvas id="revenueDonut"></canvas>
+          <div class="chart-wrap donut-wrap"><canvas id="revenueDonut"></canvas></div>
         </div>
         <div class="chart-card span-2">
           <div class="chart-head"><h3>تطور ROAS عبر الزمن</h3></div>
-          <canvas id="roasTrend"></canvas>
+          <div class="chart-wrap"><canvas id="roasTrend"></canvas></div>
         </div>
       </div>
     </section>
 
     <!-- ===== TAB: Marketing ===== -->
-    <section class="tab-content" data-tab-content="marketing">
+    <section class="tab-content" data-tab-content="marketing" id="tab-marketing">
       <div class="charts-grid">
         <div class="chart-card span-2">
           <div class="chart-head"><h3>الإنفاق والإيرادات لكل قناة</h3></div>
-          <canvas id="channelComboChart"></canvas>
+          <div class="chart-wrap"><canvas id="channelComboChart"></canvas></div>
         </div>
         <div class="chart-card">
           <div class="chart-head"><h3>ROAS لكل قناة</h3></div>
-          <canvas id="roasChannelChart"></canvas>
+          <div class="chart-wrap"><canvas id="roasChannelChart"></canvas></div>
         </div>
         <div class="chart-card">
           <div class="chart-head"><h3>عدد الطلبات لكل قناة</h3></div>
-          <canvas id="ordersChannelChart"></canvas>
+          <div class="chart-wrap"><canvas id="ordersChannelChart"></canvas></div>
         </div>
         <div class="chart-card span-2">
-          <div class="chart-head"><h3>كفاءة القنوات (CTR vs CR)</h3></div>
-          <canvas id="efficiencyChart"></canvas>
+          <div class="chart-head"><h3>كفاءة القنوات — CTR مقابل CR</h3></div>
+          <div class="chart-wrap"><canvas id="efficiencyChart"></canvas></div>
         </div>
       </div>
 
       <div class="table-card">
-        <div class="chart-head">
-          <h3>تفصيل أداء القنوات</h3>
-          <span class="muted" id="channelTableHint">إجمالي الفترة المختارة</span>
+        <div class="table-toolbar">
+          <div class="table-toolbar-right">
+            <h3>تفصيل أداء القنوات</h3>
+            <span class="badge" id="channelTableHint">إجمالي الفترة</span>
+          </div>
+          <div class="table-search-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="tableSearch" placeholder="بحث..." class="table-search">
+          </div>
         </div>
         <div class="table-wrap">
           <table id="channelTable">
             <thead>
               <tr>
-                <th>القناة</th>
-                <th>الإنفاق</th>
-                <th>الظهور</th>
-                <th>النقرات</th>
-                <th>CTR</th>
-                <th>الطلبات</th>
-                <th>CR</th>
-                <th>الإيرادات</th>
-                <th>ROAS</th>
+                <th class="sortable sticky-col" data-sort="name">القناة <span class="sort-icon">⇅</span></th>
+                <th class="sortable" data-sort="spend">الإنفاق <span class="sort-icon">⇅</span></th>
+                <th class="sortable" data-sort="imp">الظهور <span class="sort-icon">⇅</span></th>
+                <th class="sortable" data-sort="click">النقرات <span class="sort-icon">⇅</span></th>
+                <th class="sortable" data-sort="ctr">CTR <span class="sort-icon">⇅</span></th>
+                <th class="sortable" data-sort="trans">الطلبات <span class="sort-icon">⇅</span></th>
+                <th class="sortable" data-sort="cr">CR <span class="sort-icon">⇅</span></th>
+                <th class="sortable" data-sort="revenue">الإيرادات <span class="sort-icon">⇅</span></th>
+                <th class="sortable" data-sort="roas">ROAS <span class="sort-icon">⇅</span></th>
                 <th>الحالة</th>
               </tr>
             </thead>
-            <tbody></tbody>
+            <tbody id="channelTableBody"></tbody>
           </table>
         </div>
       </div>
     </section>
 
     <!-- ===== TAB: Funnel ===== -->
-    <section class="tab-content" data-tab-content="funnel">
+    <section class="tab-content" data-tab-content="funnel" id="tab-funnel">
       <div class="kpi-grid funnel-kpis">
         <div class="kpi-card accent-blue">
-          <span class="kpi-label">الزيارات (Sessions)</span>
-          <span class="kpi-value" id="fnTraffic">—</span>
+          <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+          <div class="kpi-content">
+            <span class="kpi-label">الزيارات</span>
+            <span class="kpi-value" id="fnTraffic">—</span>
+          </div>
+          <div class="kpi-glow"></div>
         </div>
         <div class="kpi-card accent-cyan">
-          <span class="kpi-label">إجمالي الطلبات</span>
-          <span class="kpi-value" id="fnOrders">—</span>
+          <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></div>
+          <div class="kpi-content">
+            <span class="kpi-label">إجمالي الطلبات</span>
+            <span class="kpi-value" id="fnOrders">—</span>
+          </div>
+          <div class="kpi-glow"></div>
         </div>
         <div class="kpi-card accent-green">
-          <span class="kpi-label">معدل التحويل</span>
-          <span class="kpi-value" id="fnCr">—</span>
+          <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+          <div class="kpi-content">
+            <span class="kpi-label">معدل التحويل</span>
+            <span class="kpi-value" id="fnCr">—</span>
+          </div>
+          <div class="kpi-glow"></div>
         </div>
         <div class="kpi-card accent-orange">
-          <span class="kpi-label">متوسط قيمة الطلب</span>
-          <span class="kpi-value" id="fnAov">—</span>
+          <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div>
+          <div class="kpi-content">
+            <span class="kpi-label">متوسط قيمة الطلب</span>
+            <span class="kpi-value" id="fnAov">—</span>
+          </div>
+          <div class="kpi-glow"></div>
         </div>
       </div>
 
       <div class="charts-grid">
         <div class="chart-card span-2">
           <div class="chart-head"><h3>قمع التحويل</h3></div>
-          <canvas id="funnelChart"></canvas>
+          <div class="chart-wrap"><canvas id="funnelChart"></canvas></div>
         </div>
         <div class="chart-card span-2">
-          <div class="chart-head"><h3>الطلبات اليومية</h3></div>
-          <canvas id="ordersTrend"></canvas>
+          <div class="chart-head"><h3>الطلبات عبر الزمن</h3></div>
+          <div class="chart-wrap"><canvas id="ordersTrend"></canvas></div>
         </div>
       </div>
     </section>
 
     <footer class="footer">
-      <span>© Joli Monitoring</span>
-      <span>•</span>
+      <span>© 2025 Joli Monitoring</span>
+      <span class="footer-sep">·</span>
       <span>مصدر البيانات: Google Sheets</span>
     </footer>
 
   </main>
+
+  <!-- Mobile Bottom Nav -->
+  <nav class="bottom-nav" id="bottomNav" role="navigation" aria-label="التنقل السفلي">
+    <button class="bnav-item active" data-tab="overview">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      <span>عامة</span>
+    </button>
+    <button class="bnav-item" data-tab="marketing">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+      <span>تسويق</span>
+    </button>
+    <button class="bnav-item" data-tab="funnel">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 3H2l8 9.46V19l4 2V12.46L22 3z"/></svg>
+      <span>قمع</span>
+    </button>
+  </nav>
+
 </div>
 
 <script src="app.js"></script>
