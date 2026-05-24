@@ -6,6 +6,7 @@
 *{box-sizing:border-box;margin:0;padding:0}
 
 :root{
+  color-scheme: light;
   --pink:      #F0006A;
   --pink-dark: #C40055;
   --pink-light:#FFF0F5;
@@ -527,3 +528,22 @@ tbody tr:hover .sticky-col{background:var(--pink-light)}
 
 /* ===== Focus ===== */
 button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
+
+/* ===== Force Light Mode — override system dark mode ===== */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: light !important;
+    --bg:        #FDF5F8 !important;
+    --bg-2:      #FFFFFF !important;
+    --card:      #FFFFFF !important;
+    --card-border:rgba(240,0,106,.10) !important;
+    --line:      rgba(240,0,106,.08) !important;
+    --text:      #1A0812 !important;
+    --muted:     #9A7285 !important;
+  }
+  html, body { background: #FDF5F8 !important; color: #1A0812 !important; }
+  .sidebar   { background: #FFFFFF !important; }
+  .kpi-card  { background: #FFFFFF !important; }
+  .chart-card, .filter-bar, .table-card { background: #FFFFFF !important; }
+  .bottom-nav { background: rgba(255,255,255,.97) !important; }
+}
