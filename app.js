@@ -5,7 +5,9 @@
 
 const SHEET_ID  = "18pvf_fuBjtBdYX4CAFgFCAmaYIRLpVGzsG_0FX0LqfY";
 const SHEET_GID = "1602116591";
-const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${SHEET_GID}&tq=${encodeURIComponent("select *")}`;
+// URLs to try in order — gid-specific first, then whole-sheet fallback
+const SHEET_URL       = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${SHEET_GID}&tq=${encodeURIComponent("select *")}`;
+const SHEET_URL_NOGID = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&tq=${encodeURIComponent("select *")}`;
 
 const COL = {
   year:1,month:2,day:3,
@@ -47,12 +49,54 @@ const num = v => {
 const fmt      = (n,d=0) => Number(n||0).toLocaleString("en-US",{maximumFractionDigits:d});
 const fmtMoney = n => fmt(n,0);
 
+/* parseRowDate — supports multiple date formats from Google Sheets:
+   dd/Mon/yyyy  →  01/Jan/2026
+   dd/mm/yyyy   →  01/01/2026
+   yyyy-mm-dd   →  2026-01-01
+   mm/dd/yyyy   →  01/15/2026 (US format)
+   d Mon yyyy   →  1 Jan 2026
+*/
 function parseRowDate(str){
-  if(!str) return null;
-  const m=String(str).match(/(\d{1,2})\/([A-Za-z]+)\/(\d{4})/);
-  if(!m) return null;
-  const M={Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
-  return new Date(+m[3],M[m[2]]??0,+m[1]);
+  if(!str||str.trim()==="") return null;
+  const s=String(str).trim();
+  const M={Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11,
+           جان:0,فبر:1,مار:2,أبر:3,ماي:4,يون:5,يول:6,أغس:7,سبت:8,أكت:9,نوف:10,ديس:11};
+
+  // Format: 01/Jan/2026 or 1/Jan/2026
+  let m=s.match(/^(\d{1,2})\/([A-Za-z]+)\/(\d{4})$/);
+  if(m) return new Date(+m[3], M[m[2]]??0, +m[1]);
+
+  // Format: 2026-01-01 (ISO)
+  m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if(m) return new Date(+m[1], +m[2]-1, +m[3]);
+
+  // Format: 01/01/2026 (dd/mm/yyyy)
+  m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if(m){
+    const day=+m[1], mon=+m[2], yr=+m[3];
+    // Distinguish dd/mm vs mm/dd: if day > 12, must be dd/mm
+    if(day>12) return new Date(yr, mon-1, day);
+    // Default assume dd/mm/yyyy (non-US)
+    return new Date(yr, mon-1, day);
+  }
+
+  // Format: 1 Jan 2026 or 01-Jan-2026
+  m=s.match(/^(\d{1,2})[\s\-\/]([A-Za-z]+)[\s\-\/](\d{4})$/);
+  if(m) return new Date(+m[3], M[m[2]]??0, +m[1]);
+
+  // Let the browser try as a last resort
+  const d=new Date(s);
+  return isNaN(d.getTime())?null:d;
+}
+
+/* Detect if a cell value looks like any recognizable date */
+function looksLikeDate(v){
+  if(!v||v.trim()==="") return false;
+  const s=String(v).trim();
+  return /\d{1,2}\/[A-Za-z]+\/\d{4}/.test(s) ||  // dd/Mon/yyyy
+         /\d{4}-\d{1,2}-\d{1,2}/.test(s)     ||  // ISO
+         /\d{1,2}\/\d{1,2}\/\d{4}/.test(s)   ||  // dd/mm/yyyy
+         /\d{1,2}[\s\-][A-Za-z]{3}[\s\-]\d{4}/.test(s); // d Mon yyyy
 }
 function fmtDateShort(d){if(!d)return "";return d.toLocaleDateString("en-GB",{day:"2-digit",month:"short"})}
 
@@ -73,22 +117,77 @@ const sumCol=(rows,idx)=>idx==null?0:rows.reduce((s,r)=>s+num(r[idx]),0);
 async function loadData(){
   showSkeleton(true);
   try{
-    const res=await fetch(SHEET_URL+"&_="+Date.now());
-    if(!res.ok) throw new Error("HTTP "+res.status);
-    const text=await res.text();
-    const parsed=Papa.parse(text,{skipEmptyLines:true});
-    RAW_ROWS=parsed.data.filter(r=>r[COL.day]&&/\d{1,2}\/[A-Za-z]+\/\d{4}/.test(r[COL.day]));
-    const ts="آخر تحديث: "+new Date().toLocaleString("ar-EG")+" — "+RAW_ROWS.length+" صف";
-    document.getElementById("lastUpdate").textContent=ts;
-    const sb=document.getElementById("lastUpdateSidebar");
-    if(sb) sb.textContent=ts;
+    // Try primary URL (with GID), fallback to no-GID if few rows returned
+    let text = await fetchCSV(SHEET_URL);
+    let parsed = Papa.parse(text, {skipEmptyLines:true});
+
+    // ---- Diagnostic: log column D values from first 10 rows ----
+    console.group("🔍 Joli Dashboard — تشخيص البيانات");
+    console.log("إجمالي الصفوف من الـ API:", parsed.data.length);
+    const sample = parsed.data.slice(0, 8).map(r => ({
+      col_day: r[COL.day], col_year: r[COL.year], col_month: r[COL.month]
+    }));
+    console.table(sample);
+
+    // ---- Filter: accept any recognizable date in column COL.day ----
+    let rows = parsed.data.filter(r => r[COL.day] && looksLikeDate(r[COL.day]));
+    console.log("صفوف بعد فلترة التاريخ:", rows.length);
+
+    // ---- If very few rows, try without GID ----
+    if(rows.length < 50){
+      console.warn("⚠️ صفوف قليلة! جاري تجربة URL بدون GID...");
+      text = await fetchCSV(SHEET_URL_NOGID);
+      parsed = Papa.parse(text, {skipEmptyLines:true});
+      console.log("صفوف من URL بدون GID:", parsed.data.length);
+      const rows2 = parsed.data.filter(r => r[COL.day] && looksLikeDate(r[COL.day]));
+      console.log("صفوف بعد الفلترة (بدون GID):", rows2.length);
+      if(rows2.length > rows.length){
+        rows = rows2;
+        console.log("✅ تم استخدام URL بدون GID — أكثر بيانات");
+      }
+    }
+
+    RAW_ROWS = rows;
+
+    // ---- Show date range ----
+    if(RAW_ROWS.length > 0){
+      const sorted = RAW_ROWS.slice().sort((a,b)=>parseRowDate(a[COL.day])-parseRowDate(b[COL.day]));
+      const firstDate = parseRowDate(sorted[0][COL.day]);
+      const lastDate  = parseRowDate(sorted[sorted.length-1][COL.day]);
+      console.log("نطاق التواريخ:", firstDate?.toLocaleDateString("ar-EG"), "←→", lastDate?.toLocaleDateString("ar-EG"));
+    }
+    console.groupEnd();
+
+    const ts = "آخر تحديث: " + new Date().toLocaleString("ar-EG") + " — " + RAW_ROWS.length + " صف";
+    document.getElementById("lastUpdate").textContent = ts;
+    const sb = document.getElementById("lastUpdateSidebar");
+    if(sb) sb.textContent = ts;
+
+    if(RAW_ROWS.length === 0){
+      showDataWarning();
+    }
+
     render();
   }catch(e){
-    console.error("❌",e);
-    document.getElementById("lastUpdate").textContent="❌ فشل: "+e.message;
+    console.error("❌ فشل تحميل البيانات:", e);
+    document.getElementById("lastUpdate").textContent = "❌ فشل: " + e.message;
   }finally{
     showSkeleton(false);
   }
+}
+
+async function fetchCSV(url){
+  const res = await fetch(url + "&_=" + Date.now());
+  if(!res.ok) throw new Error("HTTP " + res.status);
+  return res.text();
+}
+
+function showDataWarning(){
+  console.warn("⚠️ لا توجد صفوف تحتوي على تواريخ صحيحة.");
+  console.warn("تحقق من:");
+  console.warn("1- أن عمود التاريخ (COL.day =", COL.day, ") يحتوي على تواريخ");
+  console.warn("2- أن الشيت مشارك للعموم (Anyone with link → Viewer)");
+  console.warn("3- أن SHEET_GID صحيح — جرب تغييره إلى gid=0 للشيت الأول");
 }
 function showSkeleton(on){document.getElementById("skeletonOverlay")?.classList.toggle("visible",on)}
 
