@@ -5,9 +5,17 @@
 
 const SHEET_ID  = "18pvf_fuBjtBdYX4CAFgFCAmaYIRLpVGzsG_0FX0LqfY";
 const SHEET_GID = "1602116591";
-// URLs to try in order — gid-specific first, then whole-sheet fallback
-const SHEET_URL       = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${SHEET_GID}&tq=${encodeURIComponent("select *")}`;
-const SHEET_URL_NOGID = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&tq=${encodeURIComponent("select *")}`;
+
+// Strategy: export endpoint bypasses in-sheet filter views → returns ALL rows
+// gviz respects filter views so only returns visible (current-month) rows
+const SHEET_EXPORT     = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${SHEET_GID}`;
+const SHEET_EXPORT_0   = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=0`;
+const SHEET_GVIZ_FULL  = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${SHEET_GID}&headers=1`;
+const SHEET_GVIZ_SEL   = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${SHEET_GID}&tq=${encodeURIComponent("select *")}`;
+
+// Keep legacy alias used elsewhere
+const SHEET_URL        = SHEET_EXPORT;
+const SHEET_URL_NOGID  = SHEET_EXPORT_0;
 
 const COL = {
   year:1,month:2,day:3,
@@ -116,68 +124,79 @@ const sumCol=(rows,idx)=>idx==null?0:rows.reduce((s,r)=>s+num(r[idx]),0);
 /* ============ Load ============ */
 async function loadData(){
   showSkeleton(true);
-  try{
-    // Try primary URL (with GID), fallback to no-GID if few rows returned
-    let text = await fetchCSV(SHEET_URL);
-    let parsed = Papa.parse(text, {skipEmptyLines:true});
+  console.group("🔍 Joli Dashboard — تشخيص البيانات");
 
-    // ---- Diagnostic: log column D values from first 10 rows ----
-    console.group("🔍 Joli Dashboard — تشخيص البيانات");
-    console.log("إجمالي الصفوف من الـ API:", parsed.data.length);
-    const sample = parsed.data.slice(0, 8).map(r => ({
-      col_day: r[COL.day], col_year: r[COL.year], col_month: r[COL.month]
-    }));
-    console.table(sample);
+  // We try multiple URLs in priority order.
+  // export?format=csv bypasses Google Sheets filter views → returns ALL rows.
+  // gviz?select * respects filter views → may return only visible/current-month rows.
+  const urlsToTry = [
+    { label:"export GID",    url: SHEET_EXPORT    },
+    { label:"export GID=0",  url: SHEET_EXPORT_0  },
+    { label:"gviz no-tq",    url: SHEET_GVIZ_FULL },
+    { label:"gviz select *", url: SHEET_GVIZ_SEL  },
+  ];
 
-    // ---- Filter: accept any recognizable date in column COL.day ----
-    let rows = parsed.data.filter(r => r[COL.day] && looksLikeDate(r[COL.day]));
-    console.log("صفوف بعد فلترة التاريخ:", rows.length);
+  let bestRows = [];
+  let succeeded = false;
 
-    // ---- If very few rows, try without GID ----
-    if(rows.length < 50){
-      console.warn("⚠️ صفوف قليلة! جاري تجربة URL بدون GID...");
-      text = await fetchCSV(SHEET_URL_NOGID);
-      parsed = Papa.parse(text, {skipEmptyLines:true});
-      console.log("صفوف من URL بدون GID:", parsed.data.length);
-      const rows2 = parsed.data.filter(r => r[COL.day] && looksLikeDate(r[COL.day]));
-      console.log("صفوف بعد الفلترة (بدون GID):", rows2.length);
-      if(rows2.length > rows.length){
-        rows = rows2;
-        console.log("✅ تم استخدام URL بدون GID — أكثر بيانات");
+  for(const {label, url} of urlsToTry){
+    try{
+      console.log(`⏳ جاري جلب: ${label}`);
+      const text  = await fetchCSV(url);
+      const parsed = Papa.parse(text, {skipEmptyLines:true});
+      console.log(`  ← إجمالي الصفوف الخام: ${parsed.data.length}`);
+
+      // Log sample of column D for the first few rows
+      const sample = parsed.data.slice(0, 5).map(r =>
+        `[${label}] col_year=${r[COL.year]} | col_month=${r[COL.month]} | col_day=${r[COL.day]}`
+      );
+      sample.forEach(s => console.log(s));
+
+      // Keep rows that have a recognizable date in COL.day
+      const rows = parsed.data.filter(r => r[COL.day] && looksLikeDate(r[COL.day]));
+      console.log(`  ← صفوف بعد فلترة التاريخ: ${rows.length}`);
+
+      if(rows.length > bestRows.length){
+        bestRows = rows;
+        succeeded = true;
+        console.log(`  ✅ أفضل حتى الآن: ${rows.length} صف`);
       }
+
+      // If we already have ≥ 50 rows, stop trying further URLs
+      if(bestRows.length >= 50) break;
+
+    }catch(err){
+      console.warn(`  ⚠️ فشل ${label}:`, err.message);
     }
-
-    RAW_ROWS = rows;
-
-    // ---- Show date range ----
-    if(RAW_ROWS.length > 0){
-      const sorted = RAW_ROWS.slice().sort((a,b)=>parseRowDate(a[COL.day])-parseRowDate(b[COL.day]));
-      const firstDate = parseRowDate(sorted[0][COL.day]);
-      const lastDate  = parseRowDate(sorted[sorted.length-1][COL.day]);
-      console.log("نطاق التواريخ:", firstDate?.toLocaleDateString("ar-EG"), "←→", lastDate?.toLocaleDateString("ar-EG"));
-    }
-    console.groupEnd();
-
-    const ts = "آخر تحديث: " + new Date().toLocaleString("ar-EG") + " — " + RAW_ROWS.length + " صف";
-    document.getElementById("lastUpdate").textContent = ts;
-    const sb = document.getElementById("lastUpdateSidebar");
-    if(sb) sb.textContent = ts;
-
-    if(RAW_ROWS.length === 0){
-      showDataWarning();
-    }
-
-    render();
-  }catch(e){
-    console.error("❌ فشل تحميل البيانات:", e);
-    document.getElementById("lastUpdate").textContent = "❌ فشل: " + e.message;
-  }finally{
-    showSkeleton(false);
   }
+
+  RAW_ROWS = bestRows;
+
+  // Date range diagnostic
+  if(RAW_ROWS.length > 0){
+    const sorted = RAW_ROWS.slice().sort((a,b)=>parseRowDate(a[COL.day])-parseRowDate(b[COL.day]));
+    const firstDate = parseRowDate(sorted[0][COL.day]);
+    const lastDate  = parseRowDate(sorted[sorted.length-1][COL.day]);
+    console.log("📅 نطاق التواريخ:", firstDate?.toLocaleDateString("ar-EG"), "←→", lastDate?.toLocaleDateString("ar-EG"));
+    console.log("📊 إجمالي الصفوف المحملة:", RAW_ROWS.length);
+  }
+  console.groupEnd();
+
+  const ts = "آخر تحديث: " + new Date().toLocaleString("ar-EG") + " — " + RAW_ROWS.length + " صف";
+  document.getElementById("lastUpdate").textContent = ts;
+  const sb = document.getElementById("lastUpdateSidebar");
+  if(sb) sb.textContent = ts;
+
+  if(RAW_ROWS.length === 0) showDataWarning();
+
+  showSkeleton(false);
+  render();
 }
 
 async function fetchCSV(url){
-  const res = await fetch(url + "&_=" + Date.now());
+  // Add cache-buster without breaking URLs that already have a query string
+  const sep = url.includes("?") ? "&" : "?";
+  const res  = await fetch(url + sep + "_=" + Date.now(), {cache:"no-store"});
   if(!res.ok) throw new Error("HTTP " + res.status);
   return res.text();
 }
